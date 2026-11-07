@@ -1,0 +1,38 @@
+# Personal Obsidian vault data and plugin settings; never publish these.
+.obsidian/
+流水数据/
+账本/
+data.json
+community-plugins.before-install-*.json.bak
+
+# Local credentials. A documented example may be committed.
+.env
+.env.*
+!.env.example
+
+# Dependencies, local work files, and generated test output.
+node_modules/
+.local/
+.tmp/
+coverage/
+test-results/
+playwright-report/
+/.entry-*
+/.features-*
+/.ui-*
+
+# Logs, editor recovery files, and backups.
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Keep src/, scripts/, documentation and demo images in the repository.
+# Keep 安装文件/ and MyPocket-*.zip: README links to these distributable files.
