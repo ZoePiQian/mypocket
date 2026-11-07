@@ -1,6 +1,7 @@
 "use strict";
 const core = require("./core"), table = require("./monthly"), projects = require("./projects");
 const { periodPaths } = require("./periods");
+const { markdownFilesIn } = require("./scoped-files");
 
 function key(record) { return JSON.stringify([record.path, record.offset, table.fingerprint(record)]); }
 function archiveType(root, path) {
@@ -26,9 +27,11 @@ module.exports = {
   listRecovery() {
     return this.queue(async () => {
       const root = this.folder(), items = [], warnings = [];
-      const files = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(`${root}/回收站/`));
+      const files = markdownFilesIn(this.app.vault, `${root}/回收站`);
       for (const file of files) {
         try {
+          this.assertScope(root, file.path);
+          if (!file.path.startsWith(`${root}/回收站/`)) throw new Error("回收站笔记已移动，请刷新后重试");
           const text = await this.app.vault.read(file), parsed = parseArchive(this, root, text, file.path);
           warnings.push(...parsed.warnings);
           if (parsed.warnings.length) continue;

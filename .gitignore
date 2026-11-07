@@ -12,6 +12,7 @@ community-plugins.before-install-*.json.bak
 
 # Dependencies, local work files, and generated test output.
 node_modules/
+/main.js
 .local/
 .tmp/
 coverage/

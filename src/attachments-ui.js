@@ -68,11 +68,12 @@ function createReceiptEditor(parent, plugin, { record = null, dateInput, root = 
     for (const item of items) {
       const row = el(list, "div", "lfn-receipt-item"), name = item.file?.name || fileName(item.path);
       const preview = button(row, name, () => new ReceiptViewer(plugin, [item], record).open(), "lfn-link-button lfn-receipt-name"); preview.title = name;
-      el(row, "span", "lfn-help", item.file ? "待保存" : existingFile(plugin, item.path) ? "已关联" : "待同步");
+      el(row, "span", "lfn-help", item.retained ? "已保留，待关联" : item.file ? "待保存" : existingFile(plugin, item.path) ? "已关联" : "待同步");
       const remove = button(row, "移除", () => { revoke(item); items = items.filter(other => other !== item); draw(); }, "lfn-link-button"); remove.disabled = busy;
       remove.setAttribute("aria-label", `移除凭证关联：${name}`);
     }
-    message.textContent = items.some(item => item.path) ? "移除只解除这笔账的关联，原文件会保留，方便历史记录恢复。" : `图片或 PDF · 每份最多 ${MAX_BYTES / 1024 / 1024} MB · 最多 ${MAX_ATTACHMENTS} 份`;
+    message.textContent = items.some(item => item.retained) ? "未保存成功的凭证已保留；再次保存会复用原文件。移除只解除关联，原文件会保留。"
+      : items.some(item => item.path) ? "移除只解除这笔账的关联，原文件会保留，方便历史记录恢复。" : `图片或 PDF · 每份最多 ${MAX_BYTES / 1024 / 1024} MB · 最多 ${MAX_ATTACHMENTS} 份`;
   }
   picker.addEventListener("change", () => {
     const files = [...picker.files]; picker.value = ""; error.textContent = ""; if (busy || destroyed) return;
@@ -94,12 +95,23 @@ function createReceiptEditor(parent, plugin, { record = null, dateInput, root = 
       const date = dateInput?.value || record?.date || core.today(); if (!core.validDate(date)) throw new Error("请先填写有效的记账日期");
       busy = true; draw(); const imported = [], selected = [...items]; let settled = false;
       const rollback = async () => {
-        if (settled) return; settled = true; let retained = false;
+        if (settled) return; settled = true;
+        const retained = new Set(selected.filter(item => item.retained).map(item => item.path));
         for (const entry of imported.slice().reverse()) {
-          try { const result = await plugin.store.removeImportedReceipt(entry.handle, root); if (!result.removed) retained = true; } catch (_) { retained = true; }
+          let result = entry.retained;
+          try { result ||= await plugin.store.removeImportedReceipt(entry.handle, root); }
+          catch (_) { result = { removed: false, path: entry.handle.path, reusable: false }; }
+          finally { plugin.store.releaseImportedReceipt?.(entry.handle); }
+          if (!result.removed) {
+            retained.add(result.path || entry.handle.path);
+            if (result.reusable) {
+              entry.item.path = result.path; entry.item.retained = true;
+              revoke(entry.item); delete entry.item.file;
+            }
+          }
         }
         busy = false; draw();
-        if (retained) new Notice("本次未使用的部分凭证仍保留在本地凭证文件夹，请核对后整理。");
+        if (retained.size) new Notice(`账目未保存成功，以下凭证文件已保留，请核对后整理：\n${[...retained].join("\n")}`, 12000);
       };
       try {
         const attachments = [];
@@ -111,14 +123,14 @@ function createReceiptEditor(parent, plugin, { record = null, dateInput, root = 
             if (destroyed || plugin.store.folder() !== root) throw new Error("窗口或数据目录已改变，本次未保存账目");
             let handle;
             try { handle = await plugin.store.importReceipt({ name: item.file.name, data }, date, root); }
-            catch (e) { if (e.importedReceipt) imported.push({ handle: e.importedReceipt, item }); throw e; }
+            catch (e) { if (e.importedReceipt) imported.push({ handle: e.importedReceipt, item, retained: e.retainedReceipt }); throw e; }
             imported.push({ handle, item }); attachments.push(handle.path);
           }
         }
         if (destroyed || plugin.store.folder() !== root) throw new Error("窗口或数据目录已改变，本次未保存账目");
         return { attachments,
           rollback,
-          finish() { if (settled) return; settled = true; for (const entry of imported) { plugin.store.releaseImportedReceipt?.(entry.handle); entry.item.path = entry.handle.path; revoke(entry.item); delete entry.item.file; } busy = false; draw(); }
+          finish() { if (settled) return; settled = true; for (const entry of imported) { plugin.store.releaseImportedReceipt?.(entry.handle); entry.item.path = entry.handle.path; revoke(entry.item); delete entry.item.file; } for (const item of selected) delete item.retained; busy = false; draw(); }
         };
       } catch (e) { await rollback(); throw e; }
     },

@@ -1,0 +1,95 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing release tag (must match manifest.json)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.11.1
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - run: npm run check
+      - run: npm run check:release
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+      - name: Check committed install files
+        run: git diff --exit-code -- 安装文件/local-finance-notes
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-${{ matrix.os }}
+          path: 安装文件/local-finance-notes/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Attest and publish
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.11.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: plugin-*
+          path: runner-builds
+      - name: Rebuild and compare both operating systems
+        shell: bash
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          npm run check:release
+          for file in main.js manifest.json styles.css; do
+            cmp "安装文件/local-finance-notes/$file" "runner-builds/plugin-ubuntu-24.04/$file"
+            cmp "安装文件/local-finance-notes/$file" "runner-builds/plugin-windows-2022/$file"
+          done
+      - name: Attest final install files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            安装文件/local-finance-notes/main.js
+            安装文件/local-finance-notes/manifest.json
+            安装文件/local-finance-notes/styles.css
+      - name: Create draft, upload verified assets and publish
+        shell: bash
+        run: |
+          test -f "说明文档/releases/$RELEASE_VERSION.md"
+          gh release create "$RELEASE_VERSION" --verify-tag --draft --title "MyPocket $RELEASE_VERSION" --notes-file "说明文档/releases/$RELEASE_VERSION.md"
+          gh release upload "$RELEASE_VERSION" 安装文件/local-finance-notes/main.js 安装文件/local-finance-notes/manifest.json 安装文件/local-finance-notes/styles.css
+          gh release edit "$RELEASE_VERSION" --draft=false --latest

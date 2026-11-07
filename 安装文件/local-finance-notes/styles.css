@@ -10,7 +10,7 @@
 .lfn-field input:is([type="date"], [type="month"])::-webkit-datetime-edit-month-field,
 .lfn-field input:is([type="date"], [type="month"])::-webkit-datetime-edit-day-field { font: inherit; }
 .lfn-field input:is([type="date"], [type="month"])::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .6; }
-.lfn-dashboard { padding: 28px !important; overflow-y: auto; container-type: inline-size; container-name: lfn; }
+.view-content.lfn-dashboard { padding: 28px; overflow-y: auto; container-type: inline-size; container-name: lfn; }
 .lfn-shell { max-width: 1180px; margin: 0 auto; padding-bottom: 28px; }
 .lfn-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 8px 0 28px; }
 .lfn-title { min-width: 0; }
@@ -46,8 +46,10 @@
 .lfn-month-navigation .lfn-month-step:hover { background: var(--lfn-soft); color: var(--lfn-accent); }
 .lfn-month-navigation .lfn-month-step:disabled { cursor: default; opacity: .3; background: transparent; }
 .lfn-dashboard-monthbar .lfn-month-picker { position: relative; margin: 0; }
-.lfn-dashboard-monthbar .lfn-month-picker .lfn-field-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.lfn-dashboard-monthbar .lfn-month-picker input { width: 142px; height: 36px; min-height: 36px; padding: 0 6px; border: none !important; outline: none; box-shadow: none !important; border-radius: 0; background: transparent; color: var(--text-normal); font-weight: 500; font-size: 13px; }
+/* The month input has its own aria-label; the visible navigation needs no duplicate label. */
+.lfn-dashboard-monthbar .lfn-month-picker .lfn-field-label { display: none; }
+.lfn-dashboard-monthbar .lfn-month-picker input { width: 142px; height: 36px; min-height: 36px; padding: 0 6px; outline: none; border-radius: 0; background: transparent; color: var(--text-normal); font-weight: 500; font-size: 13px; }
+.lfn-dashboard .lfn-dashboard-monthbar .lfn-month-picker input { border: none; box-shadow: none; }
 .lfn-month-picker input::-webkit-datetime-edit { padding: 0; }
 .lfn-month-picker input::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .6; margin: 0; padding: 4px; }
 .lfn-dashboard-monthbar .lfn-month-today { height: 38px; padding: 0 11px; border-radius: 9px; background: var(--background-primary); box-shadow: none; border: 1px solid var(--background-modifier-border); color: var(--lfn-accent); font-weight: 500; }
@@ -182,8 +184,6 @@
 .lfn-record-toolbar .lfn-field { min-width: 0; }
 .lfn-record-toolbar .lfn-field[hidden] { display: none; }
 .lfn-record-toolbar .lfn-field:first-child { flex: 1 1 200px; }
-.lfn-record-toolbar .lfn-field:has(select[name="type"]) { flex: 0 0 95px; }
-.lfn-record-toolbar .lfn-field:has(select[name="expense_category"]) { flex: 0 1 170px; }
 .lfn-record-toolbar .lfn-type-filter { flex: 0 0 95px; }
 .lfn-record-toolbar .lfn-category-filter { flex: 0 1 170px; }
 .lfn-record-toolbar select { width: 100%; }
@@ -213,7 +213,8 @@
 .lfn-field input, .lfn-field select, .lfn-field textarea { max-width: 100%; min-width: 0; }
 .lfn-suggest { position: relative; }
 .lfn-suggest input { padding-right: 34px; }
-.lfn-suggest-toggle { position: absolute; right: 1px; top: 1px; bottom: 1px; width: 32px; padding: 0; background: transparent !important; color: var(--text-muted); box-shadow: none !important; border: none; cursor: pointer; }
+.lfn-suggest-toggle { position: absolute; right: 1px; top: 1px; bottom: 1px; width: 32px; padding: 0; color: var(--text-muted); border: none; cursor: pointer; }
+:is(.lfn-modal, .lfn-settings) .lfn-suggest .lfn-suggest-toggle { background: transparent; box-shadow: none; }
 .lfn-suggest-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20; max-height: 180px; overflow-y: auto; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: 6px; background: var(--background-primary); box-shadow: 0 4px 14px rgba(0,0,0,.18); }
 .lfn-suggest-menu[hidden] { display: none; }
 .lfn-suggest-menu .lfn-suggest-option { display: block; width: 100%; min-height: 30px; height: auto; padding: 6px 9px; text-align: left; font-size: 13px; white-space: normal; overflow-wrap: anywhere; border: none; background: transparent; box-shadow: none; cursor: pointer; }
@@ -221,7 +222,7 @@
 .lfn-suggest-empty { padding: 8px; }
 .lfn-modal select, .lfn-settings select { appearance: none; padding-right: 30px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23888888' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; }
 .lfn-field textarea { resize: vertical; }
-.lfn-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 18px; }
+.lfn-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 18px; }
 .lfn-optional-fields { margin: 12px 0 16px; font-size: 12px; }
 .lfn-optional-fields summary { color: var(--lfn-accent); cursor: pointer; padding: 6px 0; }
 .lfn-modal { max-height: 80vh; overflow-y: auto; }
@@ -356,6 +357,7 @@
 .lfn-migration-option strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
 .lfn-modal .lfn-migration-option[aria-pressed="true"] { background: var(--lfn-soft); border-color: var(--lfn-accent); color: var(--lfn-accent); }
 .lfn-migration-preview { margin-top: 16px; }
+/* Preserve hidden state when controls also have explicit flex/grid display rules. */
 .lfn-project-migration [hidden] { display: none !important; }
 .lfn-fixed-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin: 18px 0; }
 .lfn-fixed-stats .lfn-stat { padding: 12px; }
@@ -401,7 +403,7 @@
 }
 @media (max-width: 600px) {
   .lfn-personalization-tabs { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .lfn-dashboard { padding: 16px !important; }
+  .view-content.lfn-dashboard { padding: 16px; }
   .lfn-header h1 { font-size: 22px; }
   .lfn-stats { grid-template-columns: repeat(var(--lfn-stat-mobile-columns,2),minmax(0,1fr)); gap: 8px; }
   .lfn-stat { padding: 14px; }
@@ -451,10 +453,10 @@
 .lfn-touch .lfn-month-today { height: 46px; min-height: 44px; }
 .lfn-touch .lfn-toggle { min-height: 44px; }
 .lfn-touch .lfn-toggle input { flex-shrink: 0; }
-.lfn-mobile-container {
-  top: var(--lfn-viewport-top, 0px) !important; bottom: auto !important;
-  height: var(--lfn-viewport-height, 100vh) !important; height: var(--lfn-viewport-height, 100dvh) !important;
-  align-items: center !important;
+.modal-container.lfn-mobile-container {
+  top: var(--lfn-viewport-top, 0px); bottom: auto;
+  height: var(--lfn-viewport-height, 100vh);
+  align-items: center;
   padding: max(8px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
 }
 .modal.lfn-responsive-modal {
@@ -475,10 +477,15 @@
 .lfn-responsive-modal .lfn-modal-actions .lfn-button { flex: 1 1 90px; white-space: normal; }
 .lfn-responsive-modal.lfn-calculator-modal { width: 390px; }
 .lfn-touch .lfn-calculator-keypad .lfn-button { font-size: 22px; min-height: 48px; }
-.lfn-touch .lfn-memo-editor { font-size: 16px; min-height: 120px; height: 36vh; height: 36dvh; max-height: none; }
+.lfn-touch .lfn-memo-editor { font-size: 16px; min-height: 120px; height: 36vh; max-height: none; }
+/* Keep a usable vh fallback before opting into dynamic viewport units. */
+@supports (height: 100dvh) {
+  .modal-container.lfn-mobile-container { height: var(--lfn-viewport-height, 100dvh); }
+  .lfn-touch .lfn-memo-editor { height: 36dvh; }
+}
 
 @media (max-width: 600px) {
-  .lfn-dashboard.lfn-touch { padding: 16px 12px max(24px, env(safe-area-inset-bottom, 0px)) !important; }
+  .view-content.lfn-dashboard.lfn-touch { padding: 16px 12px max(24px, env(safe-area-inset-bottom, 0px)); }
   .lfn-touch .lfn-shell { padding: 0; min-width: 0; }
   .lfn-touch .lfn-header { gap: 20px; margin: 4px 0 20px; }
   .lfn-touch .lfn-header h1 { font-size: 28px; }
@@ -495,8 +502,9 @@
   .lfn-touch .lfn-panel { padding: 14px; }
   .lfn-touch .lfn-filters { gap: 10px; }
   .lfn-touch .lfn-record-toolbar .lfn-field:first-child { flex: 1 1 100%; }
-  .lfn-touch .lfn-record-toolbar .lfn-type-filter { flex: 1 1 90px; }
-  .lfn-touch .lfn-record-toolbar .lfn-category-filter { flex: 2 1 140px; }
+  /* Project filters grow on touch screens; daily filters keep their compact widths. */
+  .lfn-project-dashboard.lfn-touch .lfn-record-toolbar .lfn-type-filter { flex: 1 1 90px; }
+  .lfn-project-dashboard.lfn-touch .lfn-record-toolbar .lfn-category-filter { flex: 2 1 140px; }
   .lfn-touch .lfn-record-summary { padding: 10px 12px; gap: 8px; }
   .lfn-touch .lfn-record-summary-details { width: 100%; margin: 0; justify-content: flex-start; gap: 6px 12px; }
   .lfn-touch .lfn-record-summary-line { font-size: 12px; }
@@ -549,7 +557,7 @@
 .lfn-dashboard-monthbar .lfn-nav-end .lfn-button { min-height: 36px; background: transparent; border: 1px solid transparent; color: var(--text-muted); font-size: 12px; }
 .lfn-dashboard-monthbar .lfn-nav-end .lfn-button:hover { background: var(--lfn-soft); color: var(--lfn-accent); }
 .lfn-dashboard-monthbar .lfn-nav-end .lfn-ui-icon { width: 16px; height: 16px; flex-basis: 16px; }
-.lfn-stats-single .lfn-stat { display: grid; grid-template-columns: minmax(0,1fr) auto; column-gap: 24px; align-items: center; padding: 20px 24px; }
+.lfn-stats-single .lfn-stat { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 0 24px; align-items: center; padding: 20px 24px; }
 .lfn-stats-single .lfn-stat-label { margin-bottom: 7px; }
 .lfn-stats-single .lfn-stat-value { grid-column: 1; margin: 0; font-size: 30px; letter-spacing: -.6px; }
 .lfn-stats-single .lfn-stat > .lfn-help { grid-column: 2; grid-row: 1 / span 2; text-align: right; }
@@ -587,7 +595,7 @@
   .lfn-app-nav .lfn-utility-actions .lfn-button { padding-inline: 6px; }
   .lfn-project-tools { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); width: 100%; }
   .lfn-project-tools .lfn-button { white-space: normal; min-height: 44px; }
-  .lfn-stats-single .lfn-stat { padding: 16px 18px; column-gap: 12px; }
+  .lfn-stats-single .lfn-stat { padding: 16px 18px; gap: 0 12px; }
   .lfn-stats-single .lfn-stat-value { font-size: 28px; }
   .lfn-stats-single .lfn-stat > .lfn-help { grid-column: 1 / -1; grid-row: auto; margin-top: 6px; text-align: left; }
   .lfn-dashboard-monthbar .lfn-nav-end { width: 100%; justify-content: flex-end; margin: 0; border-top: 1px solid var(--background-modifier-border); padding-top: 6px; }
@@ -641,7 +649,10 @@
 .lfn-guide-image-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .lfn-guide-image-toolbar p { margin: 0; font-size: 13px; }
 .lfn-guide-image-toolbar button { flex-shrink: 0; min-height: 44px; }
-.lfn-guide-image-viewport { overflow: auto; max-height: 72vh; max-height: 72dvh; overscroll-behavior: contain; }
+.lfn-guide-image-viewport { overflow: auto; max-height: 72vh; overscroll-behavior: contain; }
+@supports (height: 100dvh) {
+  .lfn-guide-image-viewport { max-height: 72dvh; }
+}
 .lfn-guide-image-viewport img { display: block; width: auto; max-width: 100%; height: auto; margin-inline: auto; }
 .lfn-guide-image-viewport.is-actual-size img { max-width: none; }
 
@@ -690,6 +701,7 @@
 .lfn-template-picker-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .lfn-template-picker-actions .lfn-button { min-height: 32px; font-size: 12px; }
 .lfn-template-status.is-error { color: var(--text-error); }
+/* Hidden template labels and receipt controls must stay outside the layout. */
 .lfn-template-picker [hidden], .lfn-receipt-editor [hidden] { display: none !important; }
 .lfn-template-toolbar { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px; }
 .lfn-template-toolbar .lfn-field { flex: 1 1 180px; min-width: 0; margin: 0; }

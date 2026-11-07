@@ -122,6 +122,69 @@ test("unchanged scans reuse parses; file events invalidate only changed note", a
   const location = "data/流水/2025/2025-11.md"; v.set(location, v.text(location) + "\n虚构补充说明\n");
   v.resetReads(); await store.scan(); assert.equal(v.reads, 1);
 });
+
+test("configured folder scans preserve custom and legacy notes without enumerating or reading unrelated notes", async () => {
+  const { v, store, setFolder } = fixture(), root = "books/家用"; setFolder(root);
+  daily(v, [fm("custom")], "2026-11", `${root}/手动目录.md/自定义账本.md`);
+  const old = `${root}/导入/单笔旧记录.md`;
+  v.add(old, `---\n${codec.stringifyYaml(fm("legacy"))}\n---\n保留旧正文\n`);
+  const excluded = [`${root}/备忘录.md`, `${root}/回收站/2026.md`, `${root}/旧版备份/原始.md`];
+  for (const location of excluded) daily(v, [fm("excluded")], "2026-11", location);
+  daily(v, [fm("unrelated")], "2026-11", "books/家用外/流水/2026-11.md");
+  v.add("其他笔记.md", "unrelated private fixture");
+  Object.defineProperty(v.folder("books/家用外"), "children", { get() { throw new Error("Unrelated directory enumerated"); } });
+  v.app.vault.getMarkdownFiles = v.app.vault.getFiles = () => { throw new Error("Whole-vault enumeration"); };
+  const data = await store.scan();
+  assert.deepEqual(data.records.map(r => r.id).sort(), ["custom", "legacy"]);
+  assert.equal(data.warnings.length, 0); assert.ok(v.files.has(`${root}/旧版备份/导入/单笔旧记录.md.bak`));
+  assert.ok(v.text(`${root}/流水/2026/2026-11.md`).includes("保留旧正文"));
+  assert.ok(v.readPaths.every(location => location.startsWith(root + "/") && !excluded.includes(location)));
+  v.resetReads(); const recovery = await store.listRecovery();
+  assert.equal(recovery.items[0].record.id, "excluded"); assert.deepEqual(v.readPaths, [`${root}/回收站/2026.md`]);
+});
+
+test("year migration uses only direct legacy months and preserves custom nested paths", async () => {
+  const { v, store } = fixture();
+  const old = daily(v, [fm("old-month")], "2026-11", "data/流水/2026-11.md");
+  const nested = daily(v, [fm("nested", { date: "2026-12-05" })], "2026-12", "data/流水/手动目录/2026-12.md");
+  v.add("data/月报/2026-11.md", `---\n${codec.stringifyYaml({ finance_report: true, month: "2026-11" })}\n---\n旧月报\n`);
+  v.app.vault.getMarkdownFiles = () => { throw new Error("Whole-vault enumeration"); };
+  assert.deepEqual(await store.migrateYearFolders(), []);
+  assert.equal(v.files.has(old), false); assert.ok(v.files.has("data/流水/2026/2026-11.md"));
+  assert.ok(v.files.has("data/月报/2026/2026-11.md")); assert.ok(v.files.has(nested));
+  assert.ok(!v.readPaths.includes(nested));
+  assert.deepEqual((await store.scan()).records.map(r => r.id).sort(), ["nested", "old-month"]);
+});
+
+test("scoped traversal handles missing folders, file occupants and folders named md", async () => {
+  const { markdownFilesIn } = require("../src/scoped-files"), v = virtualVault();
+  assert.deepEqual(markdownFilesIn(v.app.vault, "missing"), []);
+  v.add("occupied", "file, not folder"); assert.deepEqual(markdownFilesIn(v.app.vault, "occupied"), []);
+  const direct = v.add("data/direct.md", "a"), nested = v.add("data/folder.md/nested.md", "b");
+  v.add("data/receipt.png", "binary fixture"); v.folder("data/empty.md");
+  const outside = v.add("data-extra/other.md", "outside");
+  v.folder("data").children.push(outside); // A stale/misparented entry must not escape the boundary.
+  assert.deepEqual(markdownFilesIn(v.app.vault, "data", { recursive: false }), [direct]);
+  assert.deepEqual(markdownFilesIn(v.app.vault, "data"), [direct, nested]);
+  await v.app.vault.rename(v.folder("data/folder.md"), "data/moved.md");
+  assert.equal(nested.path, "data/moved.md/nested.md");
+  assert.equal(v.app.vault.getAbstractFileByPath("data/folder.md/nested.md"), null);
+  assert.deepEqual(markdownFilesIn(v.app.vault, "data"), [direct, nested]);
+  assert.equal(v.folder("data/moved.md").extension, undefined);
+});
+
+test("a note moved outside the configured folder before its read is skipped", async () => {
+  const { v, store } = fixture();
+  for (let i = 0; i < 21; i++) daily(v, [fm(`note-${i}`)], "2026-11", `data/custom/${i}.md`);
+  const read = v.app.vault.read, moved = v.files.get("data/custom/20.md"); let changed = false;
+  v.app.vault.read = async file => {
+    if (!changed) { changed = true; await v.app.vault.rename(moved, "other/moved.md"); }
+    return read(file);
+  };
+  const data = await store.readAll();
+  assert.equal(data.records.length, 20); assert.ok(data.warnings.some(warning => warning.path === "other/moved.md"));
+  assert.ok(v.readPaths.every(location => location.startsWith("data/")));
+});
 test("deleted daily record restores exact cents, memo, ID and target month", async () => {
   const { v, store } = fixture(), location = daily(v, [fm("restore", { memo: "测试 | & <br>\n第二行" })]);
   const record = monthly.parse(v.text(location), location, codec).records[0]; await store.trash(record);

@@ -31,6 +31,8 @@ function build() {
   const bundle = createBundle(), output = path.join(root, "安装文件", "local-finance-notes");
   fs.mkdirSync(output, { recursive: true });
   fs.writeFileSync(path.join(output, "main.js"), bundle, "utf8");
+  // Standard entry point for Community build verification; not checked into Git.
+  fs.writeFileSync(path.join(root, "main.js"), bundle, "utf8");
   for (const file of ["manifest.json", "styles.css"]) fs.copyFileSync(path.join(root, file), path.join(output, file));
   console.log("Built 安装文件/local-finance-notes (3 installable files, offline guide included)");
 }

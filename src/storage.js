@@ -5,6 +5,7 @@ const fixed = require("./fixed");
 const projects = require("./projects");
 const { createId } = require("./identity");
 const { periodPaths } = require("./periods");
+const { markdownFilesIn } = require("./scoped-files");
 
 class FinanceStore {
   constructor(app, codec, getFolder) {
@@ -76,7 +77,7 @@ class FinanceStore {
     // Move ledgers first so reports receive updated source links before they move.
     for (const section of ["流水", "月报"]) {
       const prefix = `${root}/${section}/`;
-      const files = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(prefix)
+      const files = markdownFilesIn(this.app.vault, `${root}/${section}`, { recursive: false }).filter(file => file.path.startsWith(prefix)
         && !file.path.slice(prefix.length).includes("/") && core.validMonth(file.path.slice(prefix.length, -3)));
       for (const file of files) {
         const originalPath = file.path, month = originalPath.slice(prefix.length, -3);
@@ -90,9 +91,8 @@ class FinanceStore {
   }
   activeFiles() {
     const root = this.folder();
-    return this.app.vault.getMarkdownFiles().filter(f => f.path.startsWith(root + "/")
-      && f.path !== this.memoPath()
-      && !f.path.startsWith(`${root}/回收站/`) && !f.path.startsWith(`${root}/旧版备份/`));
+    return markdownFilesIn(this.app.vault, root, { excludeFolders: [`${root}/回收站`, `${root}/旧版备份`] })
+      .filter(f => f.path !== this.memoPath());
   }
   readMemo() {
     return this.queue(async () => {
@@ -175,6 +175,7 @@ class FinanceStore {
         if (cached && old?.file === file && old.stamp === stamp) return old.parsed;
         const epoch = this.cacheEpoch;
         try {
+          this.assertScope(root, path);
           const text = await this.app.vault.read(file), parsed = this.parseFile(text, path);
           this.assertScope(root);
           if (epoch === this.cacheEpoch && file.path === path && this.app.vault.getAbstractFileByPath(path) === file) this.parseCache.set(path, { file, stamp, parsed });

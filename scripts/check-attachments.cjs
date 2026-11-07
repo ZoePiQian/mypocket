@@ -36,6 +36,7 @@ function project(v, entries = []) {
 const paths = ["data/凭证/2026/11/午餐 & 票据.png", "data/凭证/2026/11/合同.pdf"];
 function editorFixture(store, app) {
   // A minimal document tests the editor's save/cancel lifecycle, not CSS.
+  const notices = [];
   const doc = { defaultView: { URL: { createObjectURL: () => "blob:virtual-receipt", revokeObjectURL() {} } } };
   doc.createElement = tag => ({ tagName: tag, ownerDocument: doc, children: [], handlers: {}, classList: {
     values: new Set(),
@@ -48,12 +49,12 @@ function editorFixture(store, app) {
     remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(child => child !== this); },
     addEventListener(name, fn) { (this.handlers[name] ||= []).push(fn); }, setAttribute() {} });
   const source = require("node:fs").readFileSync(require("node:path").join(__dirname, "../src/attachments-ui.js"), "utf8"), module = { exports: {} };
-  const localRequire = id => id === "obsidian" ? { Modal: class {}, Notice: class {} } : id === "./mobile" ? { adaptModal: () => () => {} } : id === "./icons" ? { decorate: value => value } : require("../src/" + id.slice(2));
+  const localRequire = id => id === "obsidian" ? { Modal: class {}, Notice: class { constructor(text) { notices.push(text); } } } : id === "./mobile" ? { adaptModal: () => () => {} } : id === "./icons" ? { decorate: value => value } : require("../src/" + id.slice(2));
   new Function("require", "module", source)(localRequire, module);
   const parent = doc.createElement("form"), editor = module.exports.createReceiptEditor(parent, { store, app }, { dateInput: { value: "2026-11-05" }, root: "data" });
   const walk = node => [node, ...node.children.flatMap(walk)]; const picker = walk(parent).find(node => node.tagName === "input");
   const pick = file => { picker.files = [file]; for (const fn of picker.handlers.change) fn(); };
-  return { editor, pick };
+  return { editor, pick, notices };
 }
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
 function register(test) {
@@ -152,8 +153,10 @@ function register(test) {
     const one = await store.importReceipt({ name: "../午餐:*?.PNG", data: PNG }, "2026-11-05", "data");
     const two = await store.importReceipt({ name: "../午餐:*?.PNG", data: PNG }, "2026-11-05", "data");
     assert.match(one.path, /^data\/凭证\/2026\/11\/午餐---[a-z0-9-]+\.png$/); assert.notEqual(one.path, two.path); assert.equal(binary.size, 2);
-    assert.equal((await store.removeImportedReceipt(one, "data")).removed, true); assert.equal(binary.size, 1);
-    assert.equal((await store.removeImportedReceipt(two, "data")).removed, true); assert.equal(binary.size, 0);
+    const retained = await store.removeImportedReceipt(one, "data");
+    assert.equal(retained.removed, false); assert.equal(retained.path, one.path); assert.equal(retained.reusable, true);
+    assert.equal((await store.removeImportedReceipt(two, "data")).removed, false); assert.equal(binary.size, 2);
+    assert.equal(store.importedReceipts.size, 0);
   });
   test("receipt rollback refuses guessed tokens, released handles, altered bytes and linked files", async () => {
     const { v, store, binary } = fixture();
@@ -173,36 +176,85 @@ function register(test) {
     const other = await store.importReceipt({ name: "合同.pdf", data: PDF }, "2026-11-05", "data"); v.add("其他笔记.md", `收据 [[${other.path}]]`);
     assert.equal((await store.removeImportedReceipt(other, "data")).removed, false); assert.ok(v.files.has(other.path));
   });
-  test("receipt rollback preserves a file changed while binary comparison is awaiting", async () => {
+  test("receipt rollback never scans notes, reads bytes or deletes files", async () => {
     const { v, store, binary } = fixture();
-    const handle = await store.importReceipt({ name: "同时修改.png", data: PNG }, "2026-11-05", "data"), read = v.app.vault.readBinary;
-    v.app.vault.readBinary = async file => { const old = await read(file); file.stat.mtime++; binary.set(file, Uint8Array.of(9, 8, 7)); return old; };
+    const handle = await store.importReceipt({ name: "同时修改.png", data: PNG }, "2026-11-05", "data"), file = v.files.get(handle.path);
+    v.add("其他笔记.md", `[[${handle.path}]]`); file.stat.mtime++; binary.set(file, Uint8Array.of(9, 8, 7));
+    for (const method of ["getMarkdownFiles", "getFiles", "read", "readBinary", "delete"]) v.app.vault[method] = () => { throw new Error("Unexpected vault access: " + method); };
     const result = await store.removeImportedReceipt(handle, "data"); assert.equal(result.removed, false); assert.ok(v.files.has(handle.path));
+    assert.equal(result.reusable, false); assert.equal(store.importedReceipts.size, 0);
     assert.deepEqual([...binary.get(v.files.get(handle.path))], [9, 8, 7]);
   });
-  test("receipt imports reject stale roots and clean own upload if root changes during binary write", async () => {
+  test("receipt imports reject stale roots and report retained upload if root changes during binary write", async () => {
     const { v, store, binary, setRoot } = fixture(); setRoot("other");
     await assert.rejects(store.importReceipt({ name: "x.png", data: PNG }, "2026-11-05", "data"), /目录/); assert.equal(binary.size, 0);
     setRoot("data"); const create = v.app.vault.createBinary;
     v.app.vault.createBinary = async (...args) => { const file = await create(...args); setRoot("other"); return file; };
-    await assert.rejects(store.importReceipt({ name: "x.png", data: PNG }, "2026-11-05", "data"), /目录/); assert.equal(binary.size, 0);
-    assert.equal([...v.files.values()].filter(file => file.extension).length, 0);
+    await assert.rejects(store.importReceipt({ name: "x.png", data: PNG }, "2026-11-05", "data"), error => {
+      assert.match(error.message, /目录/); assert.ok(error.importedReceipt);
+      assert.ok(error.message.includes(error.importedReceipt.path));
+      assert.equal(error.retainedReceipt.path, error.importedReceipt.path); assert.equal(error.retainedReceipt.removed, false);
+      assert.ok(v.files.has(error.importedReceipt.path)); return true;
+    });
+    assert.equal(binary.size, 1); assert.equal(store.importedReceipts.size, 0);
   });
-  test("failed ledger save allows exact imported receipt rollback without touching existing files", async () => {
+  test("failed ledger save retains imported receipt without touching existing ledger data", async () => {
     const { v, store, binary } = fixture(); daily(v, [fm("conflict")]);
     const previous = (await store.scan()).records[0], handle = await store.importReceipt({ name: "x.png", data: PNG }, previous.date, "data");
     await store.save(fm("conflict", { amount: "99" }), previous);
     await assert.rejects(store.save(fm("conflict", { attachments: [handle.path] }), previous), /已被修改/);
-    assert.equal((await store.removeImportedReceipt(handle, "data")).removed, true); assert.equal(binary.size, 0); assert.equal((await store.scan()).records[0].amountCents, 9900);
+    assert.equal((await store.removeImportedReceipt(handle, "data")).removed, false); assert.equal(binary.size, 1); assert.equal((await store.scan()).records[0].amountCents, 9900);
   });
-  test("receipt editor closing during binary import rolls back without saving ledger data", async () => {
-    const { v, store, binary } = fixture(), { editor, pick } = editorFixture(store, v.app), entered = deferred(), resume = deferred();
+  test("receipt editor closing during binary import retains file and notifies its path without saving ledger data", async () => {
+    const { v, store, binary } = fixture(), { editor, pick, notices } = editorFixture(store, v.app), entered = deferred(), resume = deferred();
     const create = v.app.vault.createBinary;
     v.app.vault.createBinary = async (...args) => { entered.resolve(); await resume.promise; return create(...args); };
     pick({ name: "临时票据.png", size: PNG.length, arrayBuffer: async () => PNG.buffer });
     const saving = editor.commit(); await entered.promise; editor.destroy(); resume.resolve();
-    await assert.rejects(saving, /窗口/); assert.equal(binary.size, 0); assert.equal(v.app.vault.getMarkdownFiles().length, 0);
+    await assert.rejects(saving, /窗口/); assert.equal(binary.size, 1); assert.equal(v.app.vault.getMarkdownFiles().length, 0);
+    const path = [...binary.keys()][0].path; assert.ok(notices.some(text => text.includes(path) && text.includes("保留")));
     assert.equal(store.importedReceipts.size, 0);
+  });
+  test("receipt editor retries failed saves with the retained file instead of importing duplicates", async () => {
+    const { v, store, binary } = fixture(), { editor, pick, notices } = editorFixture(store, v.app);
+    pick({ name: "重试.png", size: PNG.length, arrayBuffer: async () => PNG.buffer });
+    const first = await editor.commit(); await first.rollback();
+    assert.equal(binary.size, 1); assert.equal(store.importedReceipts.size, 0);
+    assert.ok(notices[0].includes(first.attachments[0]));
+    const retry = await editor.commit(); assert.deepEqual(retry.attachments, first.attachments); assert.equal(binary.size, 1);
+    await store.save(fm("retried", { attachments: retry.attachments })); retry.finish();
+    assert.deepEqual((await store.scan()).records[0].attachments, first.attachments); editor.destroy();
+  });
+  test("partial multi-receipt failure retains the first file and imports only the missing file on retry", async () => {
+    const { v, store, binary } = fixture(), { editor, pick, notices } = editorFixture(store, v.app);
+    const create = v.app.vault.createBinary; let calls = 0;
+    v.app.vault.createBinary = async (...args) => { if (++calls === 2) throw new Error("simulated upload failure"); return create(...args); };
+    for (const name of ["第一张.png", "第二张.png"]) pick({ name, size: PNG.length, arrayBuffer: async () => PNG.buffer });
+    await assert.rejects(editor.commit(), /simulated upload failure/);
+    const retainedPath = [...binary.keys()][0].path;
+    assert.equal(binary.size, 1); assert.equal(store.importedReceipts.size, 0); assert.ok(notices[0].includes(retainedPath));
+    const retry = await editor.commit();
+    assert.equal(binary.size, 2); assert.equal(calls, 3); assert.equal(retry.attachments[0], retainedPath);
+    await store.save(fm("multi-retried", { attachments: retry.attachments })); retry.finish(); editor.destroy();
+    assert.equal((await store.scan()).records[0].attachments.length, 2); assert.equal(store.importedReceipts.size, 0);
+  });
+  test("receipt rollback settles its original handle after the data folder changes", async () => {
+    const { store, binary, setRoot } = fixture();
+    const handle = await store.importReceipt({ name: "原目录.png", data: PNG }, "2026-11-05", "data");
+    setRoot("other"); const result = await store.removeImportedReceipt(handle, "data");
+    assert.equal(result.path, handle.path); assert.equal(result.removed, false);
+    assert.equal(binary.size, 1); assert.equal(store.importedReceipts.size, 0);
+  });
+  test("receipt editor handles folder switch errors without losing retained paths or tokens", async () => {
+    const { v, store, binary, setRoot } = fixture(), { editor, pick, notices } = editorFixture(store, v.app);
+    const create = v.app.vault.createBinary;
+    v.app.vault.createBinary = async (...args) => { const file = await create(...args); setRoot("other"); return file; };
+    pick({ name: "切换目录.pdf", size: PDF.length, arrayBuffer: async () => PDF.buffer });
+    await assert.rejects(editor.commit(), /目录/);
+    const path = [...binary.keys()][0].path;
+    assert.equal(binary.size, 1); assert.equal(store.importedReceipts.size, 0); assert.ok(notices[0].includes(path));
+    setRoot("data"); const retry = await editor.commit(); assert.deepEqual(retry.attachments, [path]); assert.equal(binary.size, 1);
+    retry.finish(); editor.destroy();
   });
   test("receipt editor finish consumes tokens and subsequent rollback never deletes saved receipt", async () => {
     const { v, store, binary } = fixture(), { editor, pick } = editorFixture(store, v.app);

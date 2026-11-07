@@ -4,11 +4,38 @@
 
 MyPocket 是一款把财务数据保存在本地 Markdown 笔记中的 Obsidian 插件。随手记录日常开销，为装修、旅行或健身建立独立专项，再用清晰的图表看懂自己的消费。
 
-作者 **Zoe Qian** · 版本 **1.0.0** · 电脑与手机共用 · 无需 Dataview 等额外插件
+作者 **Zoe Qian** · 代码版本 **1.0.1** · 电脑与手机共用 · 无需 Dataview 等额外插件
 
 当前发布采用 **[PolyForm Strict License 1.0.0](LICENSE)**。允许条款规定的非商业等用途；不授予修改插件、制作衍生作品或自行再分发的权限。源码可见，属于受限许可。详见[许可与版权](#许可与版权)。
 
 **[阅读图文使用指南 →](INTRODUCTION.md)** 从第一次记账、专项与固定费用，到手机使用、多设备同步和误删恢复。安装后也可在面板底部、个性化设置或命令面板中打开「使用指南」；文字与配图已包含在插件中，可以离线阅读。
+
+## Overview (English)
+
+MyPocket is an Obsidian plugin by **Zoe Qian** for recording expenses, income and refunds in local Markdown notes. Keep everyday spending separate from project ledgers, track recurring expense plans, and review category charts and monthly reports. Plans become expenses only when you record a payment. The interface and the [full illustrated guide](INTRODUCTION.md) are in Chinese; the guide is also available offline inside the plugin. No Dataview or other companion plugin is required.
+
+## Installation
+
+1. Download and extract the [MyPocket 1.0.1 manual installation package](MyPocket-1.0.1.zip), or use the repository's `安装文件/local-finance-notes/` folder.
+2. Copy `local-finance-notes` into your vault's `.obsidian/plugins/` folder. It must directly contain `main.js`, `manifest.json` and `styles.css`.
+3. Reload Obsidian and enable **MyPocket** under **Settings → Community plugins**. Open the wallet ribbon icon or the **MyPocket: 打开财务面板** command.
+
+Desktop and mobile use the same files. A mobile file manager may need to show hidden folders. For updates, replace only these three program files and keep your personal `data.json` and ledger data. Mobile screenshots show browser simulations; iOS has not been verified on a physical device.
+
+## Usage
+
+1. Open the dashboard and choose **记支出** (record expense). Enter the actual amount, date and category, then optionally add a payment method, note or receipt.
+2. Select **保存到笔记** (save to note). Daily transactions are saved in monthly Markdown tables; project transactions remain in their own project notes.
+3. Use the category and date filters to review spending. Lists initially show the latest 10 entries, while totals use all matching entries. Notes retain amounts to two decimal places; the dashboard rounds displayed amounts up to whole units.
+4. Open **专项** (projects) for a separate budget, **固定支出** (recurring expenses) for payment plans, or **使用指南** (user guide) for detailed instructions. Use **数据恢复** (data recovery) to preview deleted transactions or compare duplicate IDs before choosing what to restore or keep.
+
+## Data, network and license
+
+Your ledger notes and receipts stay in your vault, by default under `财务管理/流水数据/`. Settings and reference exchange-rate caches are stored in the plugin's `data.json`. Changing the data-folder setting does not move existing files. Removing a receipt link does not delete its file; files already imported during an interrupted save are also retained for you to check. Sync services are configured separately, and receipts must be included when syncing between devices.
+
+Default CNY bookkeeping works offline. Optional multi-currency support is disabled by default; when enabled, reference-rate requests use [Frankfurter](https://frankfurter.dev/) at `api.frankfurter.dev` and send dates and currency codes, not transaction amounts, accounts or notes. Saved transaction-rate snapshots are preserved. Opening external documentation links also requires a connection.
+
+The code, documentation and project assets use [PolyForm Strict License 1.0.0](LICENSE), a source-available restricted license; see [NOTICE](NOTICE) for scope and copyright. It permits the uses specified in its terms and does not grant rights to modify or redistribute the plugin. Your own ledger notes, receipts and templates are not covered by the plugin license. Version 1.0.0 was previously released under MIT; changing the license does not revoke permissions already validly granted under that earlier license.
 
 ![MyPocket 桌面面板：日常支出、分类占比与支出趋势](说明文档/images/overview.png)
 
@@ -74,7 +101,7 @@ MyPocket 是一款把财务数据保存在本地 Markdown 笔记中的 Obsidian 
 
 ## 安装到电脑或手机
 
-1. 下载并解压 [MyPocket 1.0.0 安装包](MyPocket-1.0.0.zip)，或使用本目录的 `安装文件/local-finance-notes/`。
+1. 下载并解压 [MyPocket 1.0.1 安装包](MyPocket-1.0.1.zip)，或使用本目录的 `安装文件/local-finance-notes/`。
 2. 把 `local-finance-notes` 文件夹放入目标库的 `.obsidian/plugins/`，里面应直接包含三个文件：
 
    ```text

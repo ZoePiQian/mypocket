@@ -5,16 +5,21 @@ const codec = { stringifyYaml: value => JSON.stringify(value, null, 2), parseYam
 function virtualVault() {
   const files = new Map(), contents = new Map(), listeners = new Map();
   let clock = 1, reads = 0;
+  const readPaths = [];
   const emit = (event, ...args) => { for (const fn of listeners.get(event) || []) fn(...args); };
   const attach = file => {
     const slash = file.path.lastIndexOf("/"), parentPath = slash < 0 ? "" : file.path.slice(0, slash);
-    if (parentPath && parentPath !== file.path) {
+    if (parentPath !== file.path) {
       const parent = folder(parentPath); file.parent = parent;
       if (!parent.children.includes(file)) parent.children.push(file);
     }
   };
   const folder = path => {
-    if (files.has(path)) return files.get(path);
+    if (files.has(path)) {
+      const existing = files.get(path);
+      if (!Array.isArray(existing.children)) throw new Error("Folder path occupied: " + path);
+      return existing;
+    }
     const file = { path, name: path.split("/").at(-1), children: [] };
     files.set(path, file); attach(file); return file;
   };
@@ -27,20 +32,32 @@ function virtualVault() {
     const file = files.get(path); if (!file || !contents.has(file)) throw new Error("File missing: " + path);
     contents.set(file, text); file.stat = { ...file.stat, mtime: ++clock, size: text.length }; emit("modify", file); return file;
   };
-  const read = async file => { reads++; if (!contents.has(file)) throw new Error("File missing"); return contents.get(file); };
+  const read = async file => { reads++; readPaths.push(file?.path); if (!contents.has(file)) throw new Error("File missing"); return contents.get(file); };
   const remove = async file => {
     if (files.get(file.path) !== file) throw new Error("File replaced");
-    files.delete(file.path); contents.delete(file);
+    const removed = [...files.values()].filter(entry => entry === file || (Array.isArray(file.children) && entry.path.startsWith(file.path + "/")));
+    for (const entry of removed) { files.delete(entry.path); contents.delete(entry); }
     if (file.parent) file.parent.children = file.parent.children.filter(child => child !== file);
     emit("delete", file);
   };
   const rename = async (file, target) => {
-    if (files.has(target)) throw new Error("Target exists");
-    const old = file.path; files.delete(old);
+    if (!file.path || files.get(file.path) !== file) throw new Error("File missing or vault root");
+    if (target.startsWith(file.path + "/")) throw new Error("Cannot move a folder inside itself");
+    const old = file.path, moving = [...files.values()].filter(entry => entry === file || (Array.isArray(file.children) && entry.path.startsWith(old + "/")));
+    for (const entry of moving) {
+      const destination = target + entry.path.slice(old.length);
+      if (files.has(destination) && !moving.includes(files.get(destination))) throw new Error("Target exists");
+    }
     if (file.parent) file.parent.children = file.parent.children.filter(child => child !== file);
-    file.path = target; file.name = target.split("/").at(-1); file.extension = target.split(".").at(-1);
-    files.set(target, file); attach(file); emit("rename", file, old);
+    for (const entry of moving) files.delete(entry.path);
+    for (const entry of moving) {
+      entry.path = target + entry.path.slice(old.length); entry.name = entry.path.split("/").at(-1);
+      if (!Array.isArray(entry.children)) entry.extension = entry.name.split(".").at(-1);
+      files.set(entry.path, entry);
+    }
+    attach(file); emit("rename", file, old);
   };
+  folder("");
   const vault = {
     getAbstractFileByPath: path => files.get(path) || null,
     getMarkdownFiles: () => [...files.values()].filter(file => file.extension === "md"),
@@ -60,6 +77,6 @@ function virtualVault() {
   return { app: { vault, fileManager }, codec, files, add, set, folder,
     text: path => contents.get(files.get(path)),
     snapshot: () => [...contents].map(([file, text]) => [file.path, text]).sort(([a], [b]) => a.localeCompare(b)),
-    get reads() { return reads; }, resetReads() { reads = 0; } };
+    get reads() { return reads; }, readPaths, resetReads() { reads = 0; readPaths.length = 0; } };
 }
 module.exports = { codec, virtualVault };
