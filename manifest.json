@@ -4,6 +4,6 @@
   "version": "1.0.0",
   "minAppVersion": "1.5.0",
   "description": "记录日常收支、独立专项账本与理财持仓，以本地 Markdown 保存，查看分类图表与支出趋势。",
-  "author": "Zoe",
+  "author": "Zoe Qian",
   "isDesktopOnly": false
 }
